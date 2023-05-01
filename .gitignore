@@ -1,0 +1,7 @@
+assets/
+.vscode
+.idea
+go.mod
+go.sum
+private/
+
