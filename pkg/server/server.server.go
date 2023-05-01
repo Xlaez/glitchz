@@ -40,9 +40,10 @@ func initCols(client *mongo.Client, config utils.Config, ctx context.Context, to
 
 	auth_service := services.NewAuthService(users_col, ctx)
 	user_service := services.NewUserService(users_col, ctx)
+	token_service := services.NewTokenService(tokens_col, ctx)
 
-	auth_controller = controllers.NewAuthController(auth_service, tokenMaker, config, *tokens_col, redis_client)
-	user_controller = controllers.NewUserController(user_service, tokenMaker, config, *tokens_col, redis_client)
+	auth_controller = controllers.NewAuthController(auth_service, token_service, tokenMaker, config, redis_client)
+	user_controller = controllers.NewUserController(user_service, token_service, tokenMaker, config, redis_client)
 
 	return &auth_controller, &user_controller
 }
@@ -105,7 +106,6 @@ func Run() *gin.Engine {
 
 	routes.AuthRoutes(server, *auth_col, tokenMaker)
 	routes.UserRoutes(server, *users_col, tokenMaker)
-	// routes.PoductRoutes(server, *prod_col, tokenMaker)
 
 	return server
 }

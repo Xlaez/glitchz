@@ -7,7 +7,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/go-redis/redis/v8"
-	"go.mongodb.org/mongo-driver/mongo"
 )
 
 type AuthController interface {
@@ -16,9 +15,9 @@ type AuthController interface {
 
 type authController struct {
 	s            services.AuthService
+	t            services.TokenService
 	maker        token.Maker
 	config       utils.Config
-	t_col        mongo.Collection
 	redis_client *redis.Client
 }
 
@@ -27,12 +26,12 @@ type tokens struct {
 	RefreshToken string
 }
 
-func NewAuthController(service services.AuthService, maker token.Maker, config utils.Config, token_col mongo.Collection, redis_client *redis.Client) AuthController {
+func NewAuthController(service services.AuthService, t services.TokenService, maker token.Maker, config utils.Config, redis_client *redis.Client) AuthController {
 	return &authController{
 		s:            service,
+		t:            t,
 		maker:        maker,
 		config:       config,
-		t_col:        token_col,
 		redis_client: redis_client,
 	}
 }

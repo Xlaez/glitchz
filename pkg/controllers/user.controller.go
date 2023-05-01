@@ -7,7 +7,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/go-redis/redis/v8"
-	"go.mongodb.org/mongo-driver/mongo"
 )
 
 type UserController interface {
@@ -16,18 +15,18 @@ type UserController interface {
 
 type userController struct {
 	s            services.UserService
+	t            services.TokenService
 	maker        token.Maker
 	config       utils.Config
-	t_col        mongo.Collection
 	redis_client *redis.Client
 }
 
-func NewUserController(service services.UserService, maker token.Maker, config utils.Config, token_col mongo.Collection, redis_client *redis.Client) UserController {
+func NewUserController(service services.UserService, t services.TokenService, maker token.Maker, config utils.Config, redis_client *redis.Client) UserController {
 	return &userController{
 		s:            service,
+		t:            t,
 		maker:        maker,
 		config:       config,
-		t_col:        token_col,
 		redis_client: redis_client,
 	}
 }
