@@ -4,4 +4,5 @@ assets/
 go.mod
 go.sum
 private/
+app.env
 
