@@ -10,4 +10,5 @@ import (
 func AuthRoutes(router *gin.Engine, c controllers.AuthController, token_maker token.Maker) {
 	auth := router.Group("/api/v1/auth")
 	auth.POST("/register", c.RegisterUser())
+	auth.POST("/verify-email", c.VerifyEmail())
 }
