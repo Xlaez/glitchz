@@ -21,6 +21,7 @@ import (
 var (
 	redis_client    *redis.Client
 	auth_controller controllers.AuthController
+	user_controller controllers.UserController
 )
 
 func InitTokenMaker(config utils.Config) (token.Maker, error) {
@@ -33,15 +34,17 @@ func InitTokenMaker(config utils.Config) (token.Maker, error) {
 	return tokenMaker, nil
 }
 
-func initCols(client *mongo.Client, config utils.Config, ctx context.Context, tokenMaker token.Maker, redis_client *redis.Client) *controllers.AuthController {
+func initCols(client *mongo.Client, config utils.Config, ctx context.Context, tokenMaker token.Maker, redis_client *redis.Client) (*controllers.AuthController, *controllers.UserController) {
 	users_col := client.Database(config.DbName).Collection(config.UsersCol)
 	tokens_col := client.Database(config.DbName).Collection(config.TokensCol)
 
 	auth_service := services.NewAuthService(users_col, ctx)
+	user_service := services.NewUserService(users_col, ctx)
 
 	auth_controller = controllers.NewAuthController(auth_service, tokenMaker, config, *tokens_col, redis_client)
+	user_controller = controllers.NewUserController(user_service, tokenMaker, config, *tokens_col, redis_client)
 
-	return &auth_controller
+	return &auth_controller, &user_controller
 }
 
 func Run() *gin.Engine {
@@ -87,7 +90,8 @@ func Run() *gin.Engine {
 
 	fmt.Println("MongoDB connection succesful!")
 
-	auth_col := initCols(mongoClient, config, ctx, tokenMaker, redis_client)
+	auth_col, users_col := initCols(mongoClient, config, ctx, tokenMaker, redis_client)
+
 	server := gin.Default()
 	server.Use(cors.New(cors.Options{
 		AllowedOrigins:   []string{"*"},
@@ -100,7 +104,7 @@ func Run() *gin.Engine {
 	// defer mongoClient.Disconnect(ctx)
 
 	routes.AuthRoutes(server, *auth_col, tokenMaker)
-	// routes.UserRoutes(server, *users_col, tokenMaker)
+	routes.UserRoutes(server, *users_col, tokenMaker)
 	// routes.PoductRoutes(server, *prod_col, tokenMaker)
 
 	return server
