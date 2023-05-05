@@ -11,6 +11,6 @@ type Token struct {
 	Token     string             `json:"token,omitempty" bson:"token"`
 	UserID    primitive.ObjectID `json:"userId" bson:"userId"`
 	Type      string             `json:"type" bson:"type"` // ["refresh", "access"]
-	ExpiresAT time.Time          `json:"expiresAt" bson:"expiresAt"`
+	ExpiresAT time.Duration      `json:"expiresAt" bson:"expiresAt"`
 	CreatedAT time.Time          `json:"createdAt" bson:"createdAt"`
 }

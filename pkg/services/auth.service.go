@@ -17,6 +17,8 @@ import (
 type AuthService interface {
 	CreateUser(data models.User) error
 	UpdateUser(filter bson.D, update bson.D) (mongo.UpdateResult, error)
+	LoginUser(emailOrPassword string, password string) (models.User, error)
+	GetUserById(userId primitive.ObjectID) (models.User, error)
 }
 
 type authService struct {
@@ -44,6 +46,11 @@ func (a *authService) CreateUser(data models.User) error {
 		return err
 	}
 
+	users, _ := GetUsers(a, bson.D{{Key: "username", Value: data.Username}})
+	if users != nil {
+		return errors.New("username has been taken, try another")
+	}
+
 	newUser := models.User{
 		ID:        id,
 		Username:  fmt.Sprintf("@" + data.Username),
@@ -60,6 +67,30 @@ func (a *authService) CreateUser(data models.User) error {
 	return nil
 }
 
+func (a *authService) LoginUser(emailOrUsername string, pass string) (models.User, error) {
+
+	value := make([]primitive.D, 0)
+	value = append(value, bson.D{{Key: "email", Value: emailOrUsername}})
+	value = append(value, bson.D{{Key: "username", Value: fmt.Sprint("@", emailOrUsername)}})
+
+	filter := bson.D{{Key: "$or", Value: value}}
+
+	var user models.User
+
+	if err := a.col.FindOne(a.ctx, filter, options.FindOne()).Decode(&user); err != nil {
+		if err == mongo.ErrNoDocuments {
+			return models.User{}, errors.New("username or email wrong")
+		}
+		return models.User{}, err
+	}
+
+	if err := password.ComparePassword(pass, user.Password); err != nil {
+		return models.User{}, errors.New("password does not match")
+	}
+
+	return user, nil
+}
+
 func GetUserByEmail(a *authService, email string) (models.User, error) {
 	user := models.User{}
 	filter := bson.D{{Key: "email", Value: email}}
@@ -69,6 +100,31 @@ func GetUserByEmail(a *authService, email string) (models.User, error) {
 	}
 
 	return user, nil
+}
+
+func (a *authService) GetUserById(userId primitive.ObjectID) (models.User, error) {
+	user := models.User{}
+	filter := bson.D{primitive.E{Key: "id", Value: userId}}
+
+	if err := a.col.FindOne(a.ctx, filter).Decode(&user); err == mongo.ErrNoDocuments && err != nil {
+		return models.User{}, err
+	}
+
+	return user, nil
+}
+
+func GetUsers(a *authService, filter bson.D) ([]models.User, error) {
+	cursor, err := a.col.Find(a.ctx, filter, options.Find().SetAllowDiskUse(true))
+	if err != nil {
+		return nil, err
+	}
+
+	var users []models.User
+	if err = cursor.All(a.ctx, &users); err != nil {
+		return nil, err
+	}
+
+	return users, nil
 }
 
 func (a *authService) UpdateUser(filter bson.D, update bson.D) (mongo.UpdateResult, error) {

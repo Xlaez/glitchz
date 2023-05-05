@@ -53,7 +53,7 @@ func initCols(client *mongo.Client, config utils.Config, ctx context.Context, to
 
 	auth_service := services.NewAuthService(users_col, ctx)
 	user_service := services.NewUserService(users_col, ctx)
-	token_service := services.NewTokenService(tokens_col, ctx)
+	token_service := services.NewTokenService(tokens_col, tokenMaker, ctx)
 	post_service := services.NewPostService(posts_col, ctx)
 	comment_service := services.NewCommentService(comments_col, ctx)
 	group_service := services.NewGroupService(groups_col, ctx)
@@ -67,7 +67,7 @@ func initCols(client *mongo.Client, config utils.Config, ctx context.Context, to
 	post_controller = controllers.NewPostController(post_service, tokenMaker, config, redis_client)
 	comment_controller = controllers.NewCommentController(comment_service, tokenMaker, config, redis_client)
 	group_controller = controllers.NewGroupController(group_service, &group_requests_service, tokenMaker, config, redis_client)
-	contact_controller = controllers.NewContactController(contact_service, tokenMaker, config, redis_client)
+	contact_controller = controllers.NewContactController(contact_service, user_service, tokenMaker, config, redis_client)
 	group_msgs_controller = controllers.NewGroupMsgsController(group_msgs_service, tokenMaker, config, redis_client)
 	private_msgs_controller = controllers.NewPrivateMsgsController(messages_service, tokenMaker, config, redis_client)
 
