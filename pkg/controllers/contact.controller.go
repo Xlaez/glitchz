@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"errors"
 	"fmt"
 	"glitchz/pkg/middlewares"
 	"glitchz/pkg/models"
@@ -21,9 +22,15 @@ import (
 
 type ContactController interface {
 	SendReq() gin.HandlerFunc
+	CancelReq() gin.HandlerFunc
 	AcceptReq() gin.HandlerFunc
 	GetContacts() gin.HandlerFunc
+	BlockContact() gin.HandlerFunc
+	DeleteContact() gin.HandlerFunc
 	GetContactReq() gin.HandlerFunc
+	UnBlockContact() gin.HandlerFunc
+	GetContactByID() gin.HandlerFunc
+	GetContactByUsers() gin.HandlerFunc
 }
 
 type contactController struct {
@@ -204,5 +211,170 @@ func (c *contactController) CancelReq() gin.HandlerFunc {
 			return
 		}
 
+		contact_id, err := primitive.ObjectIDFromHex(request.ID)
+		if err != nil {
+			ctx.JSON(http.StatusInternalServerError, errorRes(err))
+			return
+		}
+
+		if _, err = c.s.DeleteContact(bson.D{primitive.E{Key: "_id", Value: contact_id}, {Key: "pending", Value: true}}); err != nil {
+			ctx.JSON(http.StatusInternalServerError, errorRes(err))
+			return
+		}
+
+		ctx.JSON(http.StatusOK, msgRes("request cancelled"))
+	}
+}
+
+func (c *contactController) DeleteContact() gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		var request schema.AcceptReq
+		if err := ctx.ShouldBindJSON(&request); err != nil {
+			ctx.JSON(http.StatusBadRequest, errorRes(err))
+			return
+		}
+
+		contact_id, err := primitive.ObjectIDFromHex(request.ID)
+		if err != nil {
+			ctx.JSON(http.StatusInternalServerError, errorRes(err))
+			return
+		}
+
+		result, err := c.s.DeleteContact(bson.D{primitive.E{Key: "_id", Value: contact_id}, {Key: "pending", Value: false}})
+		if err != nil {
+			ctx.JSON(http.StatusInternalServerError, errorRes(err))
+			return
+		}
+
+		filter_one := bson.D{primitive.E{Key: "id", Value: result.User1}}
+		filter_two := bson.D{primitive.E{Key: "id", Value: result.User2}}
+		update := bson.D{{Key: "$inc", Value: bson.D{{Key: "nbContacts", Value: -1}}}}
+
+		if _, err := c.u.UpdateUser(filter_one, update); err != nil {
+			ctx.JSON(http.StatusInternalServerError, errorRes(err))
+			return
+		}
+
+		if _, err := c.u.UpdateUser(filter_two, update); err != nil {
+			ctx.JSON(http.StatusInternalServerError, errorRes(err))
+			return
+		}
+
+		ctx.JSON(http.StatusOK, msgRes("user is not a contact again"))
+	}
+}
+
+func (c *contactController) BlockContact() gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		var request schema.BlockReq
+		if err := ctx.ShouldBindJSON(&request); err != nil {
+			ctx.JSON(http.StatusBadRequest, errorRes(err))
+			return
+		}
+
+		user_id, err := primitive.ObjectIDFromHex(request.UserID)
+		if err != nil {
+			ctx.JSON(http.StatusInternalServerError, errorRes(err))
+			return
+		}
+
+		contact_id, err := primitive.ObjectIDFromHex(request.ID)
+		if err != nil {
+			ctx.JSON(http.StatusInternalServerError, errorRes(err))
+			return
+		}
+
+		filter := bson.D{primitive.E{Key: "_id", Value: contact_id}}
+		update := bson.D{{Key: "$set", Value: bson.D{{Key: "blockedIds", Value: user_id}}}}
+		result, err := c.s.UpdateReq(filter, update)
+
+		if err != nil {
+			ctx.JSON(http.StatusInternalServerError, errorRes(err))
+			return
+		}
+
+		ctx.JSON(http.StatusOK, gin.H{"result": result})
+	}
+}
+
+func (c *contactController) UnBlockContact() gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		var request schema.AcceptReq
+		if err := ctx.ShouldBindJSON(&request); err != nil {
+			ctx.JSON(http.StatusBadRequest, errorRes(err))
+			return
+		}
+
+		contact_id, err := primitive.ObjectIDFromHex(request.ID)
+		if err != nil {
+			ctx.JSON(http.StatusInternalServerError, errorRes(err))
+			return
+		}
+
+		filter := bson.D{primitive.E{Key: "_id", Value: contact_id}}
+		update := bson.D{{Key: "$set", Value: bson.D{{Key: "blockedIds", Value: nil}}}}
+		result, err := c.s.UpdateReq(filter, update)
+
+		if err != nil {
+			ctx.JSON(http.StatusInternalServerError, errorRes(err))
+			return
+		}
+
+		ctx.JSON(http.StatusOK, gin.H{"result": result})
+	}
+}
+
+func (c *contactController) GetContactByUsers() gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		var request schema.GetContactByUser
+		if err := ctx.ShouldBindQuery(&request); err != nil {
+			ctx.JSON(http.StatusBadRequest, errorRes(err))
+			return
+		}
+
+		user_id, err := primitive.ObjectIDFromHex(request.UserID)
+		if err != nil {
+			ctx.JSON(http.StatusBadRequest, errorRes(err))
+			return
+		}
+
+		payload := ctx.MustGet(middlewares.AuthorizationPayloadKey).(*token.Payload)
+		value := make([]bson.D, 0)
+		value = append(value, bson.D{{Key: "user1", Value: payload.UserID}, {Key: "user2", Value: user_id}})
+		value = append(value, bson.D{{Key: "user2", Value: payload.UserID}, {Key: "user1", Value: user_id}})
+		filter := bson.D{{Key: "$or", Value: value}}
+
+		contact, err := c.s.GetContact(filter, &options.FindOneOptions{})
+		if err != nil {
+			ctx.JSON(http.StatusNotFound, errorRes(errors.New("contact with this user does not exist")))
+			return
+		}
+
+		ctx.JSON(http.StatusOK, gin.H{"result": contact})
+	}
+}
+
+func (c *contactController) GetContactByID() gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		var request schema.GetContactByID
+		if err := ctx.ShouldBindQuery(&request); err != nil {
+			ctx.JSON(http.StatusBadRequest, errorRes(err))
+			return
+		}
+
+		contact_id, err := primitive.ObjectIDFromHex(request.ID)
+		if err != nil {
+			ctx.JSON(http.StatusBadRequest, errorRes(err))
+			return
+		}
+		filter := bson.D{primitive.E{Key: "_id", Value: contact_id}}
+
+		contact, err := c.s.GetContact(filter, &options.FindOneOptions{})
+		if err != nil {
+			ctx.JSON(http.StatusNotFound, errorRes(errors.New("contact not found")))
+			return
+		}
+
+		ctx.JSON(http.StatusOK, gin.H{"result": contact})
 	}
 }
