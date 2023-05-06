@@ -164,8 +164,15 @@ func (u *userController) UpdateProfile() gin.HandlerFunc {
 	}
 }
 
+// type UpdatePics struct{}
+
 func (u *userController) UpdatePics() gin.HandlerFunc {
 	return func(ctx *gin.Context) {
+		// var request UpdatePics
+		// if err := ctx.ShouldBind(&request); err != nil {
+		// 	ctx.JSON(http.StatusBadRequest, errorRes(err))
+		// 	return
+		// }
 		secure_url, _, err := others.UploadToCloud(ctx)
 		if err != nil {
 			ctx.JSON(http.StatusExpectationFailed, errorRes(err))
@@ -174,7 +181,7 @@ func (u *userController) UpdatePics() gin.HandlerFunc {
 
 		payload := ctx.MustGet(middlewares.AuthorizationPayloadKey).(*token.Payload)
 		filter := bson.D{primitive.E{Key: "id", Value: payload.UserID}}
-		update := bson.D{{Key: "pics", Value: secure_url}}
+		update := bson.D{{Key: "$set", Value: bson.D{{Key: "pics", Value: secure_url}}}}
 		result, err := u.s.UpdateUser(filter, update)
 
 		if err != nil {

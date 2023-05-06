@@ -16,7 +16,7 @@ func InitCloud() *cloudinary.Cloudinary {
 	if err != nil {
 		log.Fatal("Error: cannot load config file", err)
 	}
-	cld, _ := cloudinary.NewFromURL(config.CloudinaryKey)
+	cld, _ := cloudinary.NewFromParams(config.CloudinaryName, config.CloudinaryKey, config.CloudinarySecret)
 	return cld
 }
 
