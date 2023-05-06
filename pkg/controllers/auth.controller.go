@@ -8,6 +8,7 @@ import (
 	"glitchz/pkg/models"
 	"glitchz/pkg/schema"
 	"glitchz/pkg/services"
+	"glitchz/pkg/services/others"
 	"glitchz/pkg/services/password"
 	"glitchz/pkg/services/token"
 	"glitchz/pkg/utils"
@@ -274,6 +275,18 @@ func sendVerificationCode(ctx context.Context, a *authController, email string) 
 	code := utils.SixDigitsCode()
 	//TODO: set expiration duration to 30 minutes
 	if err := a.redis_client.Set(ctx, code, email, 0).Err(); err != nil {
+		return "", err
+	}
+
+	mesage := []byte(
+		`Subject: Verify Your Account
+		
+		You recently registered an account on our application and in order to proceed, you  need a 6 digits code.
+	` + code + `
+	Please ignore if you didn't perform the above function.
+	`)
+
+	if err := others.SendEmail(a.config, []string{email}, mesage); err != nil {
 		return "", err
 	}
 
