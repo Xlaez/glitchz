@@ -25,6 +25,7 @@ type PrivateMsgsController interface {
 	SetMsgRead() gin.HandlerFunc
 	AddReaction() gin.HandlerFunc
 	UpdateReaction() gin.HandlerFunc
+	GetRecentMsgs() gin.HandlerFunc
 }
 
 type privateMsgsController struct {
@@ -318,6 +319,24 @@ func (p *privateMsgsController) UpdateReaction() gin.HandlerFunc {
 func (p *privateMsgsController) GetRecentMsgs() gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		payload := ctx.MustGet(middlewares.AuthorizationPayloadKey).(*token.Payload)
+		contacts, err := p.c.GetConvsByUserId(payload.UserID)
+		if err != nil {
+			ctx.JSON(http.StatusNotFound, errorRes(err))
+			return
+		}
 
+		contactIds := make([]primitive.ObjectID, 0)
+
+		for i := 0; i < len(contacts); i++ {
+			contactIds = append(contactIds, contacts[i].ID)
+		}
+
+		msgs, err := p.s.GetRecentMsgs(contactIds, payload.UserID)
+		if err != nil {
+			ctx.JSON(http.StatusInternalServerError, errorRes(err))
+			return
+		}
+
+		ctx.JSON(http.StatusOK, gin.H{"results": msgs})
 	}
 }

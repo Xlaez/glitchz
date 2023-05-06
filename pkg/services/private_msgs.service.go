@@ -14,6 +14,7 @@ type PrivateMsgs interface {
 	SendMsg(models.Msg) error
 	Updatemsg(filter, update bson.D) error
 	GetMsgByID(id primitive.ObjectID) (models.Msg, error)
+	GetRecentMsgs(contactIds []primitive.ObjectID, userId primitive.ObjectID) ([]models.Msg, error)
 }
 
 type privateMsgs struct {
@@ -52,7 +53,24 @@ func (p *privateMsgs) GetMsgByID(id primitive.ObjectID) (models.Msg, error) {
 	return msg, nil
 }
 
-func (p *privateMsgs) GetRecentMsgs(contactIds []primitive.ObjectID, userId primitive.ObjectID) {
+func (p *privateMsgs) GetRecentMsgs(contactIds []primitive.ObjectID, userId primitive.ObjectID) ([]models.Msg, error) {
+	unread_conv := make([]bson.D, 0)
+	condition := make([]bson.D, 0)
+	condition = append(condition, bson.D{{Key: userId.String(), Value: "$readBy.userId"}})
+	unread_conv = append(unread_conv, bson.D{{Key: "$in", Value: condition}})
 
-	// contacts, err := p.col.Aggregate(p.ctx, )
+	cursor, err := p.col.Aggregate(p.ctx, mongo.Pipeline{
+		{{Key: "$match", Value: bson.D{{Key: "contactId", Value: bson.D{{Key: "$in", Value: contactIds}}}}}, {Key: "$project", Value: bson.D{{Key: "unread", Value: bson.D{{Key: "$cond", Value: unread_conv}}}}}},
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	msgs := []models.Msg{}
+	if err := cursor.All(p.ctx, &msgs); err != nil {
+		return nil, err
+	}
+
+	return msgs, err
 }

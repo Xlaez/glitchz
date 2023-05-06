@@ -11,6 +11,7 @@ import (
 func PrivateMsgtRoutes(router *gin.Engine, c controllers.PrivateMsgsController, token_maker token.Maker) {
 	auth := router.Group("/api/v1/messages").Use(middlewares.AuthMiddleWare(token_maker))
 	auth.POST("/", c.SendMsg())
+	auth.GET("/", c.GetRecentMsgs())
 	auth.POST("/react", c.AddReaction())
 	auth.PATCH("/update-reaction", c.UpdateReaction())
 	auth.PATCH("/set-read/:id", c.SetMsgRead())
