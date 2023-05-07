@@ -12,6 +12,8 @@ import (
 type GroupService interface {
 	NewGroup(data group.Group) (*mongo.InsertOneResult, error)
 	GetGroup(filter bson.D) (group.Group, error)
+	Update(filter bson.D, update bson.D) error
+	GetGroups(filter bson.D, options options.FindOptions) (int64, []group.Group, error)
 }
 
 type groupService struct {
@@ -42,4 +44,30 @@ func (g *groupService) GetGroup(filter bson.D) (group.Group, error) {
 	}
 
 	return data, nil
+}
+
+func (g *groupService) GetGroups(filter bson.D, options options.FindOptions) (int64, []group.Group, error) {
+	cursor, err := g.col.Find(g.ctx, filter, &options)
+	if err != nil {
+		return 0, nil, err
+	}
+
+	var groups []group.Group
+	if err = cursor.All(g.ctx, &groups); err != nil {
+		return 0, nil, err
+	}
+
+	count, err := g.col.CountDocuments(g.ctx, filter)
+	if err != nil {
+		return 0, nil, err
+	}
+
+	return count, groups, nil
+}
+
+func (g *groupService) Update(filter bson.D, update bson.D) error {
+	if _, err := g.col.UpdateOne(g.ctx, filter, update); err != nil {
+		return err
+	}
+	return nil
 }

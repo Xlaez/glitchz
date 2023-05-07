@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"errors"
 	"fmt"
 	"glitchz/pkg/middlewares"
 	"glitchz/pkg/models/group"
@@ -15,11 +16,17 @@ import (
 	"github.com/go-redis/redis/v8"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 type GroupController interface {
 	CreateGroup() gin.HandlerFunc
 	GetGroupByID() gin.HandlerFunc
+	GetPublicGroups() gin.HandlerFunc
+	RemoveMembers() gin.HandlerFunc
+	JoinGroup() gin.HandlerFunc
+	AddUsers() gin.HandlerFunc
 }
 
 type groupController struct {
@@ -107,3 +114,133 @@ func (g *groupController) GetGroupByID() gin.HandlerFunc {
 		ctx.JSON(http.StatusOK, gin.H{"result": group})
 	}
 }
+
+func (g *groupController) GetPublicGroups() gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		var request schema.GetGroupsReq
+		if err := ctx.ShouldBindQuery(&request); err != nil {
+			ctx.JSON(http.StatusBadRequest, errorRes(err))
+			return
+		}
+
+		filter := bson.D{{Key: "public", Value: true}}
+		counter := int64(1)
+		skip := (request.Page - counter) * request.Limit
+		options := &options.FindOptions{
+			Limit: &request.Limit,
+			Skip:  &skip,
+		}
+
+		count, groups, err := g.s.GetGroups(filter, *options)
+		if err != nil {
+			ctx.JSON(http.StatusNotFound, errorRes(err))
+			return
+		}
+		ctx.JSON(http.StatusOK, gin.H{"count": count, "groups": groups})
+	}
+}
+
+func (g *groupController) AddUsers() gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		var request schema.AddMembersToGroup
+		if err := ctx.ShouldBind(&request); err != nil {
+			ctx.JSON(http.StatusBadRequest, errorRes(err))
+			return
+		}
+		group_id, err := primitive.ObjectIDFromHex(request.GroupID)
+		if err != nil {
+			ctx.JSON(http.StatusBadRequest, errorRes(err))
+			return
+		}
+
+		members := []group.Members{}
+		for i := 0; i < len(request.IDs); i++ {
+			members = append(members, group.Members{
+				UserID:   request.IDs[i],
+				JoinedAT: time.Now(),
+			})
+		}
+
+		filter := bson.D{primitive.E{Key: "_id", Value: group_id}}
+		update := bson.D{{Key: "$addToSet", Value: bson.D{{Key: "members", Value: bson.D{{Key: "$each", Value: members}}}}}}
+
+		if err = g.s.Update(filter, update); err != nil {
+			ctx.JSON(http.StatusInternalServerError, errorRes(err))
+			return
+		}
+
+		ctx.JSON(http.StatusOK, msgRes("added"))
+	}
+}
+
+func (g *groupController) JoinGroup() gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		var request schema.JoinGroup
+		if err := ctx.ShouldBindUri(&request); err != nil {
+			ctx.JSON(http.StatusBadRequest, errorRes(err))
+			return
+		}
+		group_id, err := primitive.ObjectIDFromHex(request.GroupID)
+		if err != nil {
+			ctx.JSON(http.StatusBadRequest, errorRes(err))
+			return
+		}
+
+		_, err = g.s.GetGroup(bson.D{primitive.E{Key: "_id", Value: group_id}, {Key: "public", Value: true}})
+		if err != nil {
+			if err == mongo.ErrNoDocuments {
+				ctx.JSON(http.StatusNotAcceptable, errorRes(errors.New("you cannot join a private group using invite link")))
+				return
+			}
+			ctx.JSON(http.StatusInternalServerError, errorRes(err))
+			return
+		}
+
+		payload := ctx.MustGet(middlewares.AuthorizationPayloadKey).(*token.Payload)
+
+		filter := bson.D{primitive.E{Key: "_id", Value: group_id}}
+		update := bson.D{{Key: "$addToSet", Value: bson.D{{Key: "members", Value: group.Members{UserID: payload.UserID, JoinedAT: time.Now()}}}}}
+
+		if err = g.s.Update(filter, update); err != nil {
+			ctx.JSON(http.StatusInternalServerError, errorRes(err))
+			return
+		}
+
+		ctx.JSON(http.StatusOK, msgRes("added"))
+	}
+}
+
+// TODO: fix bug that refususes to delete users
+func (g *groupController) RemoveMembers() gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		var request schema.AddMembersToGroup
+		if err := ctx.ShouldBind(&request); err != nil {
+			ctx.JSON(http.StatusBadRequest, errorRes(err))
+			return
+		}
+		group_id, err := primitive.ObjectIDFromHex(request.GroupID)
+		if err != nil {
+			ctx.JSON(http.StatusBadRequest, errorRes(err))
+			return
+		}
+
+		members := []group.Members{}
+		for i := 0; i < len(request.IDs); i++ {
+			members = append(members, group.Members{
+				UserID: request.IDs[i],
+			})
+		}
+
+		filter := bson.D{primitive.E{Key: "_id", Value: group_id}}
+		update := bson.D{{Key: "$pull", Value: bson.D{{Key: "members.$", Value: bson.D{{Key: "$in", Value: members}}}}}}
+
+		if err = g.s.Update(filter, update); err != nil {
+			ctx.JSON(http.StatusInternalServerError, errorRes(err))
+			return
+		}
+
+		ctx.JSON(http.StatusOK, msgRes("removed"))
+	}
+}
+
+// func (g *groupController)BlockUser()gin.HandlerFunc{}
