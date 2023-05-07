@@ -25,3 +25,14 @@ type AddMembersToGroup struct {
 type JoinGroup struct {
 	GroupID string `uri:"groupId" binding:"required"`
 }
+
+type SendRequestReq struct {
+	GroupID string `json:"groupId" binding:"required"`
+	Msg     string `json:"msg"`
+}
+
+type GetGroupRequestsReq struct {
+	Limit   int64  `form:"limit" binding:"required,min=5"`
+	Page    int64  `form:"page" binidng:"required,min=1"`
+	GroupID string `form:"groupId" binding:"required"`
+}

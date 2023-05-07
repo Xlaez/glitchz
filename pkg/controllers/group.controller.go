@@ -21,23 +21,29 @@ import (
 )
 
 type GroupController interface {
-	CreateGroup() gin.HandlerFunc
-	GetGroupByID() gin.HandlerFunc
-	GetPublicGroups() gin.HandlerFunc
+	SendRequestToPrivateGroup() gin.HandlerFunc
+	GetGroupRequests() gin.HandlerFunc
 	RemoveMembers() gin.HandlerFunc
+	GetPublicGroups() gin.HandlerFunc
+	RemoveAdmins() gin.HandlerFunc
+	GetGroupByID() gin.HandlerFunc
+	CreateGroup() gin.HandlerFunc
+	UnBlockUser() gin.HandlerFunc
+	BlockUser() gin.HandlerFunc
 	JoinGroup() gin.HandlerFunc
 	AddUsers() gin.HandlerFunc
+	AddAdmin() gin.HandlerFunc
 }
 
 type groupController struct {
 	s            services.GroupService
-	request      *services.GroupRequestService
+	request      services.GroupRequestService
 	maker        token.Maker
 	config       utils.Config
 	redis_client *redis.Client
 }
 
-func NewGroupController(service services.GroupService, request *services.GroupRequestService, maker token.Maker, config utils.Config, redis_client *redis.Client) GroupController {
+func NewGroupController(service services.GroupService, request services.GroupRequestService, maker token.Maker, config utils.Config, redis_client *redis.Client) GroupController {
 	return &groupController{
 		s:            service,
 		request:      request,
@@ -232,7 +238,7 @@ func (g *groupController) RemoveMembers() gin.HandlerFunc {
 		}
 
 		filter := bson.D{primitive.E{Key: "_id", Value: group_id}}
-		update := bson.D{{Key: "$pull", Value: bson.D{{Key: "members.$", Value: bson.D{{Key: "$in", Value: members}}}}}}
+		update := bson.D{{Key: "$pull", Value: bson.D{{Key: "members", Value: bson.D{{Key: "$in", Value: members}}}}}}
 
 		if err = g.s.Update(filter, update); err != nil {
 			ctx.JSON(http.StatusInternalServerError, errorRes(err))
@@ -243,4 +249,204 @@ func (g *groupController) RemoveMembers() gin.HandlerFunc {
 	}
 }
 
-// func (g *groupController)BlockUser()gin.HandlerFunc{}
+func (g *groupController) BlockUser() gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		var request schema.AddMembersToGroup
+		if err := ctx.ShouldBindJSON(&request); err != nil {
+			ctx.JSON(http.StatusBadRequest, errorRes(err))
+			return
+		}
+
+		group_id, err := primitive.ObjectIDFromHex(request.GroupID)
+		if err != nil {
+			ctx.JSON(http.StatusBadRequest, errorRes(err))
+			return
+		}
+
+		members := []primitive.ObjectID{}
+		for i := 0; i < len(request.IDs); i++ {
+			members = append(members, request.IDs[i])
+		}
+
+		filter := bson.D{primitive.E{Key: "_id", Value: group_id}}
+		update := bson.D{{Key: "$addToSet", Value: bson.D{{Key: "blockedIds", Value: bson.D{{Key: "$each", Value: members}}}}}}
+
+		if err = g.s.Update(filter, update); err != nil {
+			ctx.JSON(http.StatusInternalServerError, errorRes(err))
+			return
+		}
+
+		ctx.JSON(http.StatusOK, msgRes("blocked!"))
+	}
+}
+
+func (g *groupController) UnBlockUser() gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		var request schema.AddMembersToGroup
+		if err := ctx.ShouldBindJSON(&request); err != nil {
+			ctx.JSON(http.StatusBadRequest, errorRes(err))
+			return
+		}
+
+		group_id, err := primitive.ObjectIDFromHex(request.GroupID)
+		if err != nil {
+			ctx.JSON(http.StatusBadRequest, errorRes(err))
+			return
+		}
+
+		members := []primitive.ObjectID{}
+		for i := 0; i < len(request.IDs); i++ {
+			members = append(members, request.IDs[i])
+		}
+
+		filter := bson.D{primitive.E{Key: "_id", Value: group_id}}
+		update := bson.D{{Key: "$pull", Value: bson.D{{Key: "blockedIds", Value: bson.D{{Key: "$in", Value: members}}}}}}
+
+		if err = g.s.Update(filter, update); err != nil {
+			ctx.JSON(http.StatusInternalServerError, errorRes(err))
+			return
+		}
+
+		ctx.JSON(http.StatusOK, msgRes("unblocked!"))
+	}
+}
+
+func (g *groupController) AddAdmin() gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		var request schema.AddMembersToGroup
+		if err := ctx.ShouldBind(&request); err != nil {
+			ctx.JSON(http.StatusBadRequest, errorRes(err))
+			return
+		}
+		group_id, err := primitive.ObjectIDFromHex(request.GroupID)
+		if err != nil {
+			ctx.JSON(http.StatusBadRequest, errorRes(err))
+			return
+		}
+
+		members := []group.Members{}
+		for i := 0; i < len(request.IDs); i++ {
+			members = append(members, group.Members{
+				UserID:   request.IDs[i],
+				JoinedAT: time.Now(),
+			})
+		}
+
+		filter := bson.D{primitive.E{Key: "_id", Value: group_id}}
+		update := bson.D{{Key: "$addToSet", Value: bson.D{{Key: "admins", Value: bson.D{{Key: "$each", Value: members}}}}}}
+
+		if err = g.s.Update(filter, update); err != nil {
+			ctx.JSON(http.StatusInternalServerError, errorRes(err))
+			return
+		}
+
+		ctx.JSON(http.StatusOK, msgRes("added"))
+	}
+}
+
+func (g *groupController) RemoveAdmins() gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		var request schema.AddMembersToGroup
+		if err := ctx.ShouldBind(&request); err != nil {
+			ctx.JSON(http.StatusBadRequest, errorRes(err))
+			return
+		}
+		group_id, err := primitive.ObjectIDFromHex(request.GroupID)
+		if err != nil {
+			ctx.JSON(http.StatusBadRequest, errorRes(err))
+			return
+		}
+
+		members := []group.Members{}
+		for i := 0; i < len(request.IDs); i++ {
+			members = append(members, group.Members{
+				UserID: request.IDs[i],
+			})
+		}
+
+		filter := bson.D{primitive.E{Key: "_id", Value: group_id}}
+		update := bson.D{{Key: "$pull", Value: bson.D{{Key: "admins", Value: bson.D{{Key: "$in", Value: members}}}}}}
+
+		if err = g.s.Update(filter, update); err != nil {
+			ctx.JSON(http.StatusInternalServerError, errorRes(err))
+			return
+		}
+
+		ctx.JSON(http.StatusOK, msgRes("removed"))
+	}
+}
+
+func (g *groupController) SendRequestToPrivateGroup() gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		var request schema.SendRequestReq
+		if err := ctx.ShouldBindJSON(&request); err != nil {
+			ctx.JSON(http.StatusBadRequest, errorRes(err))
+			return
+		}
+
+		group_id, err := primitive.ObjectIDFromHex(request.GroupID)
+		if err != nil {
+			ctx.JSON(http.StatusBadRequest, errorRes(err))
+			return
+		}
+
+		payload := ctx.MustGet(middlewares.AuthorizationPayloadKey).(*token.Payload)
+
+		if err = g.request.NewRequest(payload.UserID, group_id, request.Msg); err != nil {
+			ctx.JSON(http.StatusInternalServerError, errorRes(err))
+			return
+		}
+
+		if err = g.s.Update(bson.D{primitive.E{Key: "_id", Value: group_id}}, bson.D{{Key: "$inc", Value: bson.D{{Key: "nbRequests", Value: 1}}}}); err != nil {
+			ctx.JSON(http.StatusInternalServerError, errorRes(err))
+			return
+		}
+
+		ctx.JSON(http.StatusCreated, msgRes("message sent"))
+	}
+}
+
+func (g *groupController) GetGroupRequests() gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		var request schema.GetGroupRequestsReq
+		if err := ctx.ShouldBindQuery(&request); err != nil {
+			ctx.JSON(http.StatusBadRequest, errorRes(err))
+			return
+		}
+
+		counter := int64(1)
+		skip := (request.Page - counter) * request.Limit
+		options := &options.FindOptions{
+			Limit: &request.Limit,
+			Skip:  &skip,
+		}
+
+		group_id, err := primitive.ObjectIDFromHex(request.GroupID)
+		if err != nil {
+			ctx.JSON(http.StatusBadRequest, errorRes(err))
+			return
+		}
+
+		filter := bson.D{primitive.E{Key: "groupId", Value: group_id}}
+
+		requests, count, err := g.request.GetRequests(filter, *options)
+		if err != nil {
+			ctx.JSON(http.StatusNotFound, errorRes(err))
+			return
+		}
+
+		ctx.JSON(http.StatusOK, gin.H{"count": count, "requests": requests})
+	}
+}
+
+func (g *groupController) GetRequestByID() gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		var request schema.AcceptReq
+		if err := ctx.ShouldBindQuery(&request); err != nil {
+			ctx.JSON(http.StatusBadRequest, errorRes(err))
+			return
+		}
+
+		// request, err := g.request.GetRequestByID(request.ID)
+	}
+}
