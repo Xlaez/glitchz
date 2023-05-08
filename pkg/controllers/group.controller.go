@@ -25,10 +25,14 @@ type GroupController interface {
 	GetGroupRequests() gin.HandlerFunc
 	RemoveMembers() gin.HandlerFunc
 	GetPublicGroups() gin.HandlerFunc
+	GetRequestByID() gin.HandlerFunc
+	AcceptRequest() gin.HandlerFunc
+	CancelRequest() gin.HandlerFunc
 	RemoveAdmins() gin.HandlerFunc
 	GetGroupByID() gin.HandlerFunc
 	CreateGroup() gin.HandlerFunc
 	UnBlockUser() gin.HandlerFunc
+	DeleteGroup() gin.HandlerFunc
 	BlockUser() gin.HandlerFunc
 	JoinGroup() gin.HandlerFunc
 	AddUsers() gin.HandlerFunc
@@ -441,12 +445,148 @@ func (g *groupController) GetGroupRequests() gin.HandlerFunc {
 
 func (g *groupController) GetRequestByID() gin.HandlerFunc {
 	return func(ctx *gin.Context) {
-		var request schema.AcceptReq
-		if err := ctx.ShouldBindQuery(&request); err != nil {
+		var request schema.GetGroupByIDReq
+		if err := ctx.ShouldBindUri(&request); err != nil {
+			ctx.JSON(http.StatusBadRequest, errorRes(err))
+			return
+		}
+		id, err := primitive.ObjectIDFromHex(request.ID)
+		if err != nil {
+			ctx.JSON(http.StatusBadRequest, errorRes(err))
+			return
+		}
+		_request, err := g.request.GetRequestByID(id)
+
+		if err != nil {
+			ctx.JSON(http.StatusInternalServerError, errorRes(err))
+			return
+		}
+
+		ctx.JSON(http.StatusOK, gin.H{"result": _request})
+	}
+}
+
+func (g *groupController) AcceptRequest() gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		var request schema.GetGroupRequestByIDReq
+		if err := ctx.ShouldBindUri(&request); err != nil {
 			ctx.JSON(http.StatusBadRequest, errorRes(err))
 			return
 		}
 
-		// request, err := g.request.GetRequestByID(request.ID)
+		request_id, err := primitive.ObjectIDFromHex(request.ID)
+		if err != nil {
+			ctx.JSON(http.StatusInternalServerError, errorRes(err))
+			return
+		}
+
+		_request, err := g.request.GetRequestByID(request_id)
+		if err != nil {
+			if err == mongo.ErrNoDocuments {
+				ctx.JSON(http.StatusNotFound, errorRes(err))
+				return
+			}
+			ctx.JSON(http.StatusInternalServerError, errorRes(err))
+			return
+		}
+
+		filter1 := bson.D{primitive.E{Key: "_id", Value: _request.GroupID}}
+		update1 := bson.D{{Key: "$addToSet", Value: bson.D{{Key: "members", Value: group.Members{UserID: _request.UserID, JoinedAT: time.Now()}}}}, {Key: "$inc", Value: bson.D{{Key: "nbRequests", Value: -1}}}}
+
+		if err = g.s.Update(filter1, update1); err != nil {
+			ctx.JSON(http.StatusInternalServerError, errorRes(err))
+			return
+		}
+
+		if err = g.request.DeleteRequest(bson.D{primitive.E{Key: "_id", Value: _request.ID}}); err != nil {
+			ctx.JSON(http.StatusBadRequest, errorRes(err))
+			return
+		}
+
+		ctx.JSON(http.StatusOK, msgRes("added"))
+	}
+}
+
+func (g *groupController) CancelRequest() gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		var request schema.GetGroupRequestByIDReq
+		if err := ctx.ShouldBindUri(&request); err != nil {
+			ctx.JSON(http.StatusBadRequest, errorRes(err))
+			return
+		}
+
+		request_id, err := primitive.ObjectIDFromHex(request.ID)
+		if err != nil {
+			ctx.JSON(http.StatusInternalServerError, errorRes(err))
+			return
+		}
+
+		_request, err := g.request.GetRequestByID(request_id)
+		if err != nil {
+			if err == mongo.ErrNoDocuments {
+				ctx.JSON(http.StatusNotFound, errorRes(err))
+				return
+			}
+			ctx.JSON(http.StatusInternalServerError, errorRes(err))
+			return
+		}
+
+		filter1 := bson.D{primitive.E{Key: "_id", Value: _request.GroupID}}
+		update1 := bson.D{{Key: "$inc", Value: bson.D{{Key: "nbRequests", Value: -1}}}}
+
+		if err = g.s.Update(filter1, update1); err != nil {
+			ctx.JSON(http.StatusInternalServerError, errorRes(err))
+			return
+		}
+
+		if err = g.request.DeleteRequest(bson.D{primitive.E{Key: "_id", Value: _request.ID}}); err != nil {
+			ctx.JSON(http.StatusBadRequest, errorRes(err))
+			return
+		}
+
+		ctx.JSON(http.StatusOK, msgRes("deleted"))
+	}
+}
+
+func (g *groupController) DeleteGroup() gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		var request schema.GetGroupRequestByIDReq
+		if err := ctx.ShouldBindUri(&request); err != nil {
+			ctx.JSON(http.StatusBadRequest, errorRes(err))
+			return
+		}
+
+		group_id, err := primitive.ObjectIDFromHex(request.ID)
+		if err != nil {
+			ctx.JSON(http.StatusInternalServerError, errorRes(err))
+			return
+		}
+
+		group, err := g.s.GetGroup(bson.D{primitive.E{Key: "_id", Value: group_id}})
+		if err != nil {
+			if err == mongo.ErrNoDocuments {
+				ctx.JSON(http.StatusNotFound, errorRes(err))
+				return
+			}
+			ctx.JSON(http.StatusInternalServerError, errorRes(err))
+			return
+		}
+
+		payload := ctx.MustGet(middlewares.AuthorizationPayloadKey).(*token.Payload)
+
+		for i := 0; i < len(group.Admins); i++ {
+			if group.Admins[0].UserID != payload.UserID {
+				ctx.JSON(http.StatusBadRequest, errorRes(errors.New("you don't have the neccesary rights to delete this group")))
+				return
+			}
+		}
+
+		filter := bson.D{primitive.E{Key: "_id", Value: group_id}}
+		if err := g.s.DeleteGroup(filter); err != nil {
+			ctx.JSON(http.StatusInternalServerError, errorRes(err))
+			return
+		}
+
+		ctx.JSON(http.StatusOK, msgRes("deleted"))
 	}
 }

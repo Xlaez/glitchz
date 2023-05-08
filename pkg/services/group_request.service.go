@@ -14,7 +14,8 @@ import (
 type GroupRequestService interface {
 	NewRequest(userId primitive.ObjectID, groupId primitive.ObjectID, msg string) error
 	GetRequests(filter bson.D, option options.FindOptions) ([]group.Request, int64, error)
-	GetRequestByID(id string) (group.Request, error)
+	GetRequestByID(id primitive.ObjectID) (group.Request, error)
+	DeleteRequest(filter bson.D) error
 }
 
 type groupRequestService struct {
@@ -65,16 +66,18 @@ func (g *groupRequestService) GetRequests(filter bson.D, option options.FindOpti
 	return requests, count, nil
 }
 
-func (g *groupRequestService) GetRequestByID(id string) (group.Request, error) {
-	request_id, err := primitive.ObjectIDFromHex(id)
-	if err != nil {
-		return group.Request{}, err
-	}
-
+func (g *groupRequestService) GetRequestByID(request_id primitive.ObjectID) (group.Request, error) {
 	request := group.Request{}
 	if err := g.col.FindOne(g.ctx, bson.D{primitive.E{Key: "_id", Value: request_id}}, options.FindOne()).Decode(&request); err != nil {
 		return group.Request{}, err
 	}
 
 	return request, nil
+}
+
+func (g *groupRequestService) DeleteRequest(filter bson.D) error {
+	if _, err := g.col.DeleteOne(g.ctx, filter); err != nil {
+		return err
+	}
+	return nil
 }

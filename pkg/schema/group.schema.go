@@ -36,3 +36,7 @@ type GetGroupRequestsReq struct {
 	Page    int64  `form:"page" binidng:"required,min=1"`
 	GroupID string `form:"groupId" binding:"required"`
 }
+
+type GetGroupRequestByIDReq struct {
+	ID string `uri:"id" binding:"required"`
+}

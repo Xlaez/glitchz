@@ -10,10 +10,11 @@ import (
 )
 
 type GroupService interface {
+	GetGroups(filter bson.D, options options.FindOptions) (int64, []group.Group, error)
 	NewGroup(data group.Group) (*mongo.InsertOneResult, error)
 	GetGroup(filter bson.D) (group.Group, error)
 	Update(filter bson.D, update bson.D) error
-	GetGroups(filter bson.D, options options.FindOptions) (int64, []group.Group, error)
+	DeleteGroup(filter bson.D) error
 }
 
 type groupService struct {
@@ -67,6 +68,13 @@ func (g *groupService) GetGroups(filter bson.D, options options.FindOptions) (in
 
 func (g *groupService) Update(filter bson.D, update bson.D) error {
 	if _, err := g.col.UpdateOne(g.ctx, filter, update); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (g *groupService) DeleteGroup(filter bson.D) error {
+	if _, err := g.col.DeleteOne(g.ctx, filter); err != nil {
 		return err
 	}
 	return nil
