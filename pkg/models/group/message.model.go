@@ -7,7 +7,7 @@ import (
 )
 
 type GroupMsg struct {
-	ID        primitive.ObjectID `json:"id,omitempty" bson:"id"`
+	ID        primitive.ObjectID `json:"id,omitempty" bson:"_id"`
 	GroupID   primitive.ObjectID `json:"groupId,omitempty" bson:"groupId"`
 	Sender    primitive.ObjectID `json:"sender,omitempty" bson:"sender"`
 	ISDeleted bool               `json:"isDeleted" bson:"isDeleted" default:"false"`

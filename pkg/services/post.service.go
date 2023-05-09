@@ -2,12 +2,14 @@ package services
 
 import (
 	"context"
+	"glitchz/pkg/models"
 
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 type PostService interface {
-	NewPost()
+	NewPost(insertData models.Post) error
 }
 
 type postService struct {
@@ -22,4 +24,9 @@ func NewPostService(col *mongo.Collection, ctx context.Context) PostService {
 	}
 }
 
-func (p *postService) NewPost() {}
+func (p *postService) NewPost(insertData models.Post) error {
+	if _, err := p.col.InsertOne(p.ctx, insertData, options.InsertOne()); err != nil {
+		return err
+	}
+	return nil
+}

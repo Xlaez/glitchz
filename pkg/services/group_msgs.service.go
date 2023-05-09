@@ -2,12 +2,13 @@ package services
 
 import (
 	"context"
+	"glitchz/pkg/models/group"
 
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
 type GroupMsgs interface {
-	SendMsg()
+	SendMsg(insertBody group.GroupMsg) error
 }
 
 type groupMsgs struct {
@@ -22,4 +23,9 @@ func NewGroupMsgs(col *mongo.Collection, ctx context.Context) GroupMsgs {
 	}
 }
 
-func (g *groupMsgs) SendMsg() {}
+func (g *groupMsgs) SendMsg(insertBody group.GroupMsg) error {
+	if _, err := g.col.InsertOne(g.ctx, insertBody); err != nil {
+		return err
+	}
+	return nil
+}

@@ -40,3 +40,7 @@ type GetGroupRequestsReq struct {
 type GetGroupRequestByIDReq struct {
 	ID string `uri:"id" binding:"required"`
 }
+
+type UploadPicsReq struct {
+	ID string `form:"id" binding:"required"`
+}

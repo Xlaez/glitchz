@@ -7,6 +7,7 @@ import (
 	"glitchz/pkg/models/group"
 	"glitchz/pkg/schema"
 	"glitchz/pkg/services"
+	"glitchz/pkg/services/others"
 	"glitchz/pkg/services/token"
 	"glitchz/pkg/utils"
 	"net/http"
@@ -23,6 +24,7 @@ import (
 type GroupController interface {
 	SendRequestToPrivateGroup() gin.HandlerFunc
 	GetGroupRequests() gin.HandlerFunc
+	UploadGroupPics() gin.HandlerFunc
 	RemoveMembers() gin.HandlerFunc
 	GetPublicGroups() gin.HandlerFunc
 	GetRequestByID() gin.HandlerFunc
@@ -588,5 +590,39 @@ func (g *groupController) DeleteGroup() gin.HandlerFunc {
 		}
 
 		ctx.JSON(http.StatusOK, msgRes("deleted"))
+	}
+}
+
+func (g *groupController) UploadGroupPics() gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		var request schema.UploadPicsReq
+		if err := ctx.ShouldBind(&request); err != nil {
+			ctx.JSON(http.StatusBadRequest, errorRes(err))
+			return
+		}
+
+		secure_url, _, err := others.UploadToCloud(ctx)
+
+		if err != nil {
+			ctx.JSON(http.StatusExpectationFailed, errorRes(err))
+			return
+		}
+
+		group_id, err := primitive.ObjectIDFromHex(request.ID)
+
+		if err != nil {
+			ctx.JSON(http.StatusBadRequest, errorRes(err))
+			return
+		}
+
+		filter := bson.D{primitive.E{Key: "_id", Value: group_id}}
+		update := bson.D{{Key: "pics", Value: secure_url}}
+
+		if err = g.s.Update(filter, update); err != nil {
+			ctx.JSON(http.StatusInternalServerError, errorRes(err))
+			return
+		}
+
+		ctx.JSON(http.StatusOK, msgRes("group image updated"))
 	}
 }

@@ -10,6 +10,7 @@ import (
 
 func GroupRoutes(router *gin.Engine, c controllers.GroupController, g controllers.GroupMsgsController, token_maker token.Maker) {
 	group := router.Group("/api/v1/groups").Use(middlewares.AuthMiddleWare(token_maker))
+	group_msg := router.Group("/api/v1/groups/msg").Use(middlewares.AuthMiddleWare(token_maker))
 	group.GET("/", c.GetPublicGroups())
 	group.GET("/requests", c.GetGroupRequests())
 	group.GET("/requests/:id", c.GetRequestByID())
@@ -22,8 +23,10 @@ func GroupRoutes(router *gin.Engine, c controllers.GroupController, g controller
 	group.POST("/accept-request/:id", c.AcceptRequest())
 	group.POST("/cancel-request/:id", c.CancelRequest())
 	group.POST("/block", c.BlockUser())
+	group.PATCH("/upload-pics", c.UploadGroupPics())
 	group.DELETE("/:id", c.DeleteGroup())
 	group.DELETE("/unblock", c.UnBlockUser())
 	group.DELETE("/remove-members", c.RemoveMembers())
 	group.DELETE("/remove-admins", c.RemoveAdmins())
+	group_msg.POST("/", g.SendMsg())
 }
