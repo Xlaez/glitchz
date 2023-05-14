@@ -13,6 +13,8 @@ type PostService interface {
 	NewPost(insertData models.Post) error
 	GetPost(filter bson.D) (models.Post, error)
 	GetPosts(filter bson.D, options *options.FindOptions) (int64, []models.Post, error)
+	Update(filter bson.D, updateObj bson.D) (*mongo.UpdateResult, error)
+	Delete(filter bson.D) error
 }
 
 type postService struct {
@@ -62,4 +64,19 @@ func (p *postService) GetPosts(filter bson.D, options *options.FindOptions) (int
 	}
 
 	return count, posts, nil
+}
+
+func (p *postService) Update(filter bson.D, updateObj bson.D) (*mongo.UpdateResult, error) {
+	result, err := p.col.UpdateOne(p.ctx, filter, updateObj, options.Update())
+	if err != nil {
+		return &mongo.UpdateResult{}, err
+	}
+	return result, nil
+}
+
+func (p *postService) Delete(filter bson.D) error {
+	if _, err := p.col.DeleteOne(p.ctx, filter, options.Delete()); err != nil {
+		return err
+	}
+	return nil
 }

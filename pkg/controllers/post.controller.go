@@ -24,6 +24,9 @@ type PostController interface {
 	CreatePost() gin.HandlerFunc
 	GetPostByID() gin.HandlerFunc
 	GetUserPosts() gin.HandlerFunc
+	GetAllPosts() gin.HandlerFunc
+	UpdatePost() gin.HandlerFunc
+	DeletePost() gin.HandlerFunc
 }
 
 type postController struct {
@@ -141,3 +144,130 @@ func (p *postController) GetUserPosts() gin.HandlerFunc {
 		ctx.JSON(http.StatusOK, gin.H{"totalPosts": totalPosts, "posts": posts})
 	}
 }
+
+func (p *postController) GetAllPosts() gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		var request schema.GetAllPostsReq
+		if err := ctx.ShouldBindQuery(&request); err != nil {
+			ctx.JSON(http.StatusBadRequest, errorRes(err))
+			return
+		}
+
+		filter := bson.D{{}}
+		counter := int64(1)
+		page := int64(request.Page)
+		limit := int64(request.Limit)
+		skip := (page - counter) * limit
+
+		options := &options.FindOptions{
+			Limit: &limit,
+			Skip:  &skip,
+		}
+
+		totalPosts, posts, err := p.s.GetPosts(filter, options)
+		if err != nil {
+			if err == mongo.ErrNoDocuments {
+				ctx.JSON(http.StatusNotFound, errorRes(errors.New("resource not found")))
+				return
+			}
+			ctx.JSON(http.StatusInternalServerError, errorRes(err))
+			return
+		}
+		ctx.JSON(http.StatusOK, gin.H{"totalPosts": totalPosts, "posts": posts})
+	}
+}
+
+func (p *postController) UpdatePost() gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		var request schema.UpdatePostReq
+		if err := ctx.ShouldBindJSON(&request); err != nil {
+			ctx.JSON(http.StatusBadRequest, errorRes(err))
+			return
+		}
+
+		id, err := primitive.ObjectIDFromHex(request.ID)
+		if err != nil {
+			ctx.JSON(http.StatusBadRequest, errorRes(errors.New("post id is not a valid bson objectID")))
+			return
+		}
+		payload := ctx.MustGet(middlewares.AuthorizationPayloadKey).(*token.Payload)
+		_, err = p.s.GetPost(bson.D{primitive.E{Key: "_id", Value: id}, {Key: "userId", Value: payload.UserID}})
+
+		if err != nil {
+			if err == mongo.ErrNoDocuments {
+				ctx.JSON(http.StatusForbidden, errorRes(errors.New("you are not the author hence don't have authority to perform this action")))
+				return
+			}
+			ctx.JSON(http.StatusInternalServerError, errorRes(err))
+			return
+		}
+
+		filter := bson.D{primitive.E{Key: "_id", Value: id}}
+		var update bson.D
+
+		if request.Text != "" && request.Public != "" {
+			var public bool
+			if request.Public == "false" {
+				public = false
+			} else if request.Public == "true" {
+				public = true
+			}
+			update = bson.D{{Key: "$set", Value: bson.D{{Key: "text", Value: request.Text}, {Key: "public", Value: public}, {Key: "updatedAt", Value: time.Now()}}}}
+		} else if request.Text != "" {
+			update = bson.D{{Key: "$set", Value: bson.D{{Key: "text", Value: request.Text}, {Key: "updatedAt", Value: time.Now()}}}}
+		} else if request.Public != "" {
+			var public bool
+			if request.Public == "false" {
+				public = false
+			} else if request.Public == "true" {
+				public = true
+			}
+			update = bson.D{{Key: "$set", Value: bson.D{{Key: "public", Value: public}, {Key: "updatedAt", Value: time.Now()}}}}
+		} else {
+			ctx.JSON(http.StatusBadRequest, errorRes(errors.New("provide text and/or public")))
+			return
+		}
+
+		if _, err = p.s.Update(filter, update); err != nil {
+			ctx.JSON(http.StatusInternalServerError, errorRes(err))
+			return
+		}
+
+		ctx.JSON(http.StatusOK, msgRes("update"))
+	}
+}
+
+func (p *postController) DeletePost() gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		var request schema.DeletePostReq
+		if err := ctx.ShouldBindUri(&request); err != nil {
+			ctx.JSON(http.StatusBadRequest, errorRes(err))
+			return
+		}
+
+		id, err := primitive.ObjectIDFromHex(request.ID)
+		if err != nil {
+			ctx.JSON(http.StatusBadRequest, errorRes(errors.New("post''s id is a valid bson objectId")))
+			return
+		}
+		payload := ctx.MustGet(middlewares.AuthorizationPayloadKey).(*token.Payload)
+		_, err = p.s.GetPost(bson.D{primitive.E{Key: "_id", Value: id}, {Key: "userId", Value: payload.UserID}})
+
+		if err != nil {
+			if err == mongo.ErrNoDocuments {
+				ctx.JSON(http.StatusForbidden, errorRes(errors.New("you are not the author hence don't have authority to perform this action")))
+				return
+			}
+			ctx.JSON(http.StatusInternalServerError, errorRes(err))
+			return
+		}
+
+		if err = p.s.Delete(bson.D{primitive.E{Key: "_id", Value: id}}); err != nil {
+			ctx.JSON(http.StatusInternalServerError, errorRes(err))
+			return
+		}
+		ctx.JSON(http.StatusOK, msgRes("deleted resource"))
+	}
+}
+
+// func(p *postController)GetUserFriendsPost()gin.HandlerFunc{}
