@@ -43,15 +43,17 @@ type GroupController interface {
 
 type groupController struct {
 	s            services.GroupService
+	n            services.NotificationService
 	request      services.GroupRequestService
 	maker        token.Maker
 	config       utils.Config
 	redis_client *redis.Client
 }
 
-func NewGroupController(service services.GroupService, request services.GroupRequestService, maker token.Maker, config utils.Config, redis_client *redis.Client) GroupController {
+func NewGroupController(service services.GroupService, n services.NotificationService, request services.GroupRequestService, maker token.Maker, config utils.Config, redis_client *redis.Client) GroupController {
 	return &groupController{
 		s:            service,
+		n:            n,
 		request:      request,
 		maker:        maker,
 		config:       config,

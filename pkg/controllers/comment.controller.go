@@ -29,15 +29,17 @@ type CommentController interface {
 
 type commentController struct {
 	s            services.CommentService
+	n            services.NotificationService
 	p            services.PostService
 	maker        token.Maker
 	config       utils.Config
 	redis_client *redis.Client
 }
 
-func NewCommentController(service services.CommentService, p services.PostService, maker token.Maker, config utils.Config, redis_client *redis.Client) CommentController {
+func NewCommentController(service services.CommentService, n services.NotificationService, p services.PostService, maker token.Maker, config utils.Config, redis_client *redis.Client) CommentController {
 	return &commentController{
 		s:            service,
+		n:            n,
 		p:            p,
 		maker:        maker,
 		config:       config,
@@ -93,7 +95,8 @@ func (c *commentController) CreateComment() gin.HandlerFunc {
 			}
 		}
 
-		if err = c.s.NewComment(insertData); err != nil {
+		_, err = c.s.NewComment(insertData)
+		if err != nil {
 			ctx.JSON(http.StatusInternalServerError, errorRes(err))
 			return
 		}

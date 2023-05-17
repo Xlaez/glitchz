@@ -50,6 +50,7 @@ func initCols(client *mongo.Client, config utils.Config, ctx context.Context, to
 	contacts_col := client.Database(config.DbName).Collection(config.ContactsCol)
 	messages_col := client.Database(config.DbName).Collection(config.MsgCol)
 	group_msgs_col := client.Database(config.DbName).Collection(config.GroupMsgCol)
+	notification_col := client.Database(config.DbName).Collection(config.NotificationCol)
 
 	auth_service := services.NewAuthService(users_col, ctx)
 	user_service := services.NewUserService(users_col, ctx)
@@ -61,13 +62,14 @@ func initCols(client *mongo.Client, config utils.Config, ctx context.Context, to
 	contact_service := services.NewContactService(contacts_col, ctx)
 	messages_service := services.NewPrivateMsgs(messages_col, ctx)
 	group_msgs_service := services.NewGroupMsgs(group_msgs_col, ctx)
+	notification_service := services.NewNotificationService(notification_col, ctx)
 
 	auth_controller = controllers.NewAuthController(auth_service, token_service, tokenMaker, config, redis_client)
 	user_controller = controllers.NewUserController(user_service, token_service, tokenMaker, config, redis_client)
-	post_controller = controllers.NewPostController(post_service, tokenMaker, config, redis_client)
-	comment_controller = controllers.NewCommentController(comment_service, post_service, tokenMaker, config, redis_client)
-	group_controller = controllers.NewGroupController(group_service, group_requests_service, tokenMaker, config, redis_client)
-	contact_controller = controllers.NewContactController(contact_service, user_service, tokenMaker, config, redis_client)
+	post_controller = controllers.NewPostController(post_service, notification_service, tokenMaker, config, redis_client)
+	comment_controller = controllers.NewCommentController(comment_service, notification_service, post_service, tokenMaker, config, redis_client)
+	group_controller = controllers.NewGroupController(group_service, notification_service, group_requests_service, tokenMaker, config, redis_client)
+	contact_controller = controllers.NewContactController(contact_service, notification_service, user_service, tokenMaker, config, redis_client)
 	group_msgs_controller = controllers.NewGroupMsgsController(group_msgs_service, tokenMaker, config, redis_client)
 	private_msgs_controller = controllers.NewPrivateMsgsController(messages_service, contact_service, tokenMaker, config, redis_client)
 

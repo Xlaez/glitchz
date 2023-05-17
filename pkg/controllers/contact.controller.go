@@ -35,15 +35,17 @@ type ContactController interface {
 
 type contactController struct {
 	s            services.ContactService
+	n            services.NotificationService
 	u            services.UserService
 	maker        token.Maker
 	config       utils.Config
 	redis_client *redis.Client
 }
 
-func NewContactController(service services.ContactService, u services.UserService, maker token.Maker, config utils.Config, redis_client *redis.Client) ContactController {
+func NewContactController(service services.ContactService, n services.NotificationService, u services.UserService, maker token.Maker, config utils.Config, redis_client *redis.Client) ContactController {
 	return &contactController{
 		s:            service,
+		n:            n,
 		u:            u,
 		maker:        maker,
 		config:       config,

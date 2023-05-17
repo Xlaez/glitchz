@@ -31,14 +31,16 @@ type PostController interface {
 
 type postController struct {
 	s            services.PostService
+	n            services.NotificationService
 	maker        token.Maker
 	config       utils.Config
 	redis_client *redis.Client
 }
 
-func NewPostController(service services.PostService, maker token.Maker, config utils.Config, redis_client *redis.Client) PostController {
+func NewPostController(service services.PostService, n services.NotificationService, maker token.Maker, config utils.Config, redis_client *redis.Client) PostController {
 	return &postController{
 		s:            service,
+		n:            n,
 		maker:        maker,
 		config:       config,
 		redis_client: redis_client,

@@ -8,7 +8,8 @@ import (
 )
 
 type NotificationService interface {
-	NewNotification() error
+	NewNotification(data models.Notification) (*mongo.InsertOneResult, error)
+	InsertMany(data []interface{}) error
 }
 
 type notificationService struct {
@@ -30,4 +31,12 @@ func (n *notificationService) NewNotification(data models.Notification) (*mongo.
 		return &mongo.InsertOneResult{}, err
 	}
 	return result, nil
+}
+
+func (n *notificationService) InsertMany(data []interface{}) error {
+	if _, err := n.col.InsertMany(n.ctx, []interface{}{}); err != nil {
+		return err
+	}
+
+	return nil
 }
