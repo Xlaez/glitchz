@@ -14,6 +14,8 @@ type CommentService interface {
 	GetComments(filter bson.D, options *options.FindOptions) ([]models.Comment, error)
 	UpdateComment(filter bson.D, update bson.D) (*models.Comment, error)
 	GetComment(filter bson.D) (*models.Comment, error)
+	DeleteManyComment(filter bson.D) error
+	DeleteOneComment(filter bson.D) error
 }
 
 type commentService struct {
@@ -62,4 +64,18 @@ func (c *commentService) GetComment(filter bson.D) (*models.Comment, error) {
 		return &models.Comment{}, err
 	}
 	return &comment, nil
+}
+
+func (c *commentService) DeleteOneComment(filter bson.D) error {
+	if _, err := c.col.DeleteOne(c.ctx, filter, options.Delete()); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (c *commentService) DeleteManyComment(filter bson.D) error {
+	if _, err := c.col.DeleteMany(c.ctx, filter, options.Delete()); err != nil {
+		return err
+	}
+	return nil
 }

@@ -11,4 +11,8 @@ import (
 func CommentRoute(router *gin.Engine, c controllers.CommentController, token_maker token.Maker) {
 	comment := router.Group("/api/v1/posts/comments").Use(middlewares.AuthMiddleWare(token_maker))
 	comment.POST("/", c.CreateComment())
+	comment.GET("/", c.GetComments())
+	comment.PATCH("/", c.UpdateComment())
+	comment.GET("/replies", c.GetCommentReplies())
+	comment.DELETE("/:id", c.DeleteComment())
 }

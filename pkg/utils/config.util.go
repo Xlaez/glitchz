@@ -30,6 +30,7 @@ type Config struct {
 	GroupMsgCol         string        `mapstrucutre:"GROUP_MSG_COL"`
 	GroupRequestCol     string        `mapstructure:"GROUP_REQUESTS_COL"`
 	TokensCol           string        `mapstructure:"TOKEN_COL"`
+	NotificationCol     string        `mapstructure:"NOTIFICATION_COL"`
 }
 
 func LoadConfig(path string) (config Config, err error) {
