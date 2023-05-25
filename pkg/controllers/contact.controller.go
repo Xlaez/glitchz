@@ -2,7 +2,6 @@ package controllers
 
 import (
 	"errors"
-	"fmt"
 	"glitchz/pkg/middlewares"
 	"glitchz/pkg/models"
 	"glitchz/pkg/schema"
@@ -105,13 +104,12 @@ func (c *contactController) AcceptReq() gin.HandlerFunc {
 		filter := bson.D{primitive.E{Key: "_id", Value: request_id}}
 		update := bson.D{{Key: "$set", Value: bson.D{{Key: "pending", Value: false}, {Key: "acceptedAt", Value: time.Now()}}}}
 
-		result, err := c.s.UpdateReq(filter, update)
+		col, result, err := c.s.UpdateReq(filter, update)
 		if err != nil {
 			ctx.JSON(http.StatusInternalServerError, errorRes(err))
 			return
 		}
 
-		fmt.Print(result)
 		userFilter1 := bson.D{primitive.E{Key: "id", Value: result.User1}}
 		userFilter2 := bson.D{primitive.E{Key: "id", Value: result.User2}}
 		userUpdate := bson.D{{Key: "$inc", Value: bson.D{{Key: "nbContacts", Value: 1}}}}
@@ -125,6 +123,48 @@ func (c *contactController) AcceptReq() gin.HandlerFunc {
 			ctx.JSONP(http.StatusInternalServerError, errorRes(err))
 			return
 		}
+
+		payload := ctx.MustGet(middlewares.AuthorizationPayloadKey).(*token.Payload)
+
+		var user_id primitive.ObjectID
+
+		if payload.UserID == result.User1 {
+			user_id = result.User2
+		} else if payload.UserID == result.User2 {
+			user_id = result.User1
+		}
+
+		notificationChan := make(chan error)
+
+		// go func() {
+		// var err error
+		contacts, err := services.GetUserContacts(ctx, col, user_id)
+		if err == nil && contacts != nil {
+			for i := 0; i < len(contacts); i++ {
+				var contact_id primitive.ObjectID
+				if contacts[i].User1 == payload.UserID {
+					contact_id = contacts[i].User2
+				} else if contacts[i].User2 == payload.UserID {
+					contact_id = contacts[i].User1
+				}
+				// notificationData = append(notificationData, models.Notification{})
+				_, err = c.n.NewNotification(models.Notification{
+					ID:        primitive.NewObjectID(),
+					UserID:    contact_id,
+					Msg:       "has accepted your connection request",
+					Image:     "friends",
+					Seen:      false,
+					CreatedAT: time.Now(),
+				})
+			}
+			notificationChan <- err
+		}
+
+		if notificationChan != nil {
+			ctx.JSON(http.StatusInternalServerError, errorRes(<-notificationChan))
+			return
+		}
+		// }()
 
 		ctx.JSON(http.StatusOK, msgRes("you are now contacts"))
 	}
@@ -288,7 +328,7 @@ func (c *contactController) BlockContact() gin.HandlerFunc {
 
 		filter := bson.D{primitive.E{Key: "_id", Value: contact_id}}
 		update := bson.D{{Key: "$set", Value: bson.D{{Key: "blockedIds", Value: user_id}}}}
-		result, err := c.s.UpdateReq(filter, update)
+		_, result, err := c.s.UpdateReq(filter, update)
 
 		if err != nil {
 			ctx.JSON(http.StatusInternalServerError, errorRes(err))
@@ -315,7 +355,7 @@ func (c *contactController) UnBlockContact() gin.HandlerFunc {
 
 		filter := bson.D{primitive.E{Key: "_id", Value: contact_id}}
 		update := bson.D{{Key: "$set", Value: bson.D{{Key: "blockedIds", Value: nil}}}}
-		result, err := c.s.UpdateReq(filter, update)
+		_, result, err := c.s.UpdateReq(filter, update)
 
 		if err != nil {
 			ctx.JSON(http.StatusInternalServerError, errorRes(err))

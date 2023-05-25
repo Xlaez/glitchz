@@ -10,7 +10,7 @@ import (
 )
 
 type CommentService interface {
-	NewComment(data models.Comment) (*mongo.Collection, error)
+	NewComment(data models.Comment) error
 	GetComments(filter bson.D, options *options.FindOptions) ([]models.Comment, error)
 	UpdateComment(filter bson.D, update bson.D) (*models.Comment, error)
 	GetComment(filter bson.D) (*models.Comment, error)
@@ -30,12 +30,12 @@ func NewCommentService(col *mongo.Collection, ctx context.Context) CommentServic
 	}
 }
 
-func (c *commentService) NewComment(data models.Comment) (*mongo.Collection, error) {
+func (c *commentService) NewComment(data models.Comment) error {
 	_, err := c.col.InsertOne(c.ctx, data, options.InsertOne())
 	if err != nil {
-		return nil, err
+		return err
 	}
-	return c.col, nil
+	return nil
 }
 
 func (c *commentService) GetComments(filter bson.D, options *options.FindOptions) ([]models.Comment, error) {

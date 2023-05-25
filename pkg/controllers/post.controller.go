@@ -27,6 +27,8 @@ type PostController interface {
 	GetAllPosts() gin.HandlerFunc
 	UpdatePost() gin.HandlerFunc
 	DeletePost() gin.HandlerFunc
+	LikePost() gin.HandlerFunc
+	UnLikePost() gin.HandlerFunc
 }
 
 type postController struct {
@@ -272,4 +274,88 @@ func (p *postController) DeletePost() gin.HandlerFunc {
 	}
 }
 
-// func(p *postController)GetUserFriendsPost()gin.HandlerFunc{}
+func (p *postController) LikePost() gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		var request schema.DeletePostReq
+		if err := ctx.ShouldBindUri(&request); err != nil {
+			ctx.JSON(http.StatusBadRequest, errorRes(err))
+			return
+		}
+
+		id, err := primitive.ObjectIDFromHex(request.ID)
+		if err != nil {
+			ctx.JSON(http.StatusBadRequest, errorRes(errors.New("post's id is not a valid objectID")))
+			return
+		}
+
+		payload := ctx.MustGet(middlewares.AuthorizationPayloadKey).(*token.Payload)
+
+		filter := bson.D{primitive.E{Key: "_id", Value: id}}
+		post, err := p.s.GetPost(filter)
+		if err != nil {
+			if err == mongo.ErrNoDocuments {
+				ctx.JSON(http.StatusNotFound, errorRes(errors.New("post not found")))
+				return
+			}
+			ctx.JSON(http.StatusInternalServerError, errorRes(err))
+			return
+		}
+
+		var update bson.D
+		if post.Likes == nil {
+			updateObj := []models.Likes{}
+			updateObj = append(updateObj, models.Likes{
+				UserID: payload.UserID,
+			})
+			update = bson.D{{Key: "$set", Value: bson.D{{Key: "likes", Value: updateObj}}}, {Key: "$inc", Value: bson.D{{Key: "nbLikes", Value: 1}}}}
+		} else if len(post.Likes) > 0 {
+			updateObj := models.Likes{
+				UserID: payload.UserID,
+			}
+			update = bson.D{{Key: "$addToSet", Value: bson.D{{Key: "likes", Value: updateObj}}}, {Key: "$inc", Value: bson.D{{Key: "nbLikes", Value: 1}}}}
+		}
+
+		if _, err = p.s.Update(filter, update); err != nil {
+			ctx.JSON(http.StatusInternalServerError, errorRes(err))
+			return
+		}
+
+		ctx.JSON(http.StatusOK, msgRes("liked!"))
+	}
+}
+
+func (p *postController) UnLikePost() gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		var request schema.DeletePostReq
+		if err := ctx.ShouldBindUri(&request); err != nil {
+			ctx.JSON(http.StatusBadRequest, errorRes(err))
+			return
+		}
+
+		id, err := primitive.ObjectIDFromHex(request.ID)
+		if err != nil {
+			ctx.JSON(http.StatusBadRequest, errorRes(errors.New("post's id is not a valid objectID")))
+			return
+		}
+
+		payload := ctx.MustGet(middlewares.AuthorizationPayloadKey).(*token.Payload)
+
+		filter := bson.D{primitive.E{Key: "_id", Value: id}}
+		var update bson.D
+
+		updateObj := models.Likes{
+			UserID: payload.UserID,
+		}
+
+		update = bson.D{{Key: "$pull", Value: bson.D{{Key: "likes", Value: updateObj}}}, {Key: "$inc", Value: bson.D{{Key: "nbLikes", Value: -1}}}}
+
+		if _, err = p.s.Update(filter, update); err != nil {
+			ctx.JSON(http.StatusInternalServerError, errorRes(err))
+			return
+		}
+
+		ctx.JSON(http.StatusOK, msgRes("unliked!"))
+	}
+}
+
+// func(p *postController)GetUserFriendsPost()gin.HandlrFunc{}

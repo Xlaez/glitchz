@@ -16,4 +16,6 @@ func PostRoutes(router *gin.Engine, c controllers.PostController, token_maker to
 	post.GET("/user", c.GetUserPosts())
 	post.PATCH("/", c.UpdatePost())
 	post.DELETE("/:id", c.DeletePost())
+	post.PUT("/like/:id", c.LikePost())
+	post.DELETE("/unlike/:id", c.UnLikePost())
 }

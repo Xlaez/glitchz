@@ -14,7 +14,7 @@ import (
 type ContactService interface {
 	GetContact(bson.D, *options.FindOneOptions) (models.Contact, error)
 	SendReq(data models.Contact) (string, error)
-	UpdateReq(filter bson.D, update bson.D) (models.Contact, error)
+	UpdateReq(filter bson.D, update bson.D) (*mongo.Collection, models.Contact, error)
 	GetContacts(bson.D, *options.FindOptions) ([]models.Contact, int64, error)
 	GetConvsByUserId(id primitive.ObjectID) ([]models.Contact, error)
 	DeleteContact(filter bson.D) (models.Contact, error)
@@ -42,10 +42,10 @@ func (c *contactService) SendReq(data models.Contact) (string, error) {
 	return fmt.Sprint(result), nil
 }
 
-func (c *contactService) UpdateReq(filter, update bson.D) (models.Contact, error) {
+func (c *contactService) UpdateReq(filter, update bson.D) (*mongo.Collection, models.Contact, error) {
 	result := models.Contact{}
 	c.col.FindOneAndUpdate(c.ctx, filter, update, options.FindOneAndUpdate()).Decode(&result)
-	return result, nil
+	return nil, result, nil
 }
 
 func (c *contactService) GetContacts(filter bson.D, options *options.FindOptions) ([]models.Contact, int64, error) {

@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"fmt"
 	"glitchz/pkg/models"
 
 	"go.mongodb.org/mongo-driver/bson"
@@ -15,7 +16,7 @@ func GetUserContacts(ctx context.Context, col *mongo.Collection, userId primitiv
 	filter := make([]bson.D, 0)
 	filter = append(filter, bson.D{{Key: "user1", Value: userId}, {Key: "pending", Value: false}})
 	filter = append(filter, bson.D{{Key: "user2", Value: userId}, {Key: "pending", Value: false}})
-	cursor, err := col.Find(ctx, filter, options.Find())
+	cursor, err := col.Find(ctx, bson.D{{Key: "$or", Value: filter}}, options.Find())
 
 	if err != nil {
 		return nil, err
@@ -28,6 +29,6 @@ func GetUserContacts(ctx context.Context, col *mongo.Collection, userId primitiv
 	if err = cursor.Close(ctx); err != nil {
 		return nil, err
 	}
-
+	fmt.Print(contacts)
 	return contacts, nil
 }

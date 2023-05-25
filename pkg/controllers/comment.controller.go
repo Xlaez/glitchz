@@ -63,6 +63,12 @@ func (c *commentController) CreateComment() gin.HandlerFunc {
 			return
 		}
 
+		post, err := c.p.GetPost(bson.D{primitive.E{Key: "_id", Value: post_id}})
+		if err != nil {
+			ctx.JSON(http.StatusNotFound, errorRes(errors.New("cannot find post")))
+			return
+		}
+
 		insertData := models.Comment{
 			ID:        primitive.NewObjectID(),
 			UserID:    payload.UserID,
@@ -95,13 +101,27 @@ func (c *commentController) CreateComment() gin.HandlerFunc {
 			}
 		}
 
-		_, err = c.s.NewComment(insertData)
+		err = c.s.NewComment(insertData)
 		if err != nil {
 			ctx.JSON(http.StatusInternalServerError, errorRes(err))
 			return
 		}
 
+		notificationObj := models.Notification{
+			ID:        primitive.NewObjectID(),
+			UserID:    post.UserID,
+			Msg:       "A user has added a comment to your post",
+			Image:     "comment",
+			Seen:      false,
+			CreatedAT: time.Now(),
+		}
+
 		if _, err = c.p.Update(bson.D{primitive.E{Key: "_id", Value: post_id}}, bson.D{{Key: "$inc", Value: bson.D{{Key: "nbComments", Value: 1}}}}); err != nil {
+			ctx.JSON(http.StatusInternalServerError, errorRes(err))
+			return
+		}
+
+		if _, err := c.n.NewNotification(notificationObj); err != nil {
 			ctx.JSON(http.StatusInternalServerError, errorRes(err))
 			return
 		}
