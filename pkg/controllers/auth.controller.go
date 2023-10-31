@@ -47,6 +47,18 @@ func NewAuthController(service services.AuthService, t services.TokenService, ma
 	}
 }
 
+// RegisterUser godoc
+// @Summary      Create an account
+// @Description  singup using email username and password
+// @Tags         auth
+// @Accept       json
+// @Param user body schema.AddUserReq true "Add User"
+// @Produce      json
+// @Success      200  {object} schema.AddUserRes
+// @Failure      400  {errors}  errors
+// @Failure      404  {errors}  errors
+// @Failure      500  {errors}  errors
+// @Router       /auth/register [post]
 func (a *authController) RegisterUser() gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		var request schema.AddUserReq
@@ -71,7 +83,7 @@ func (a *authController) RegisterUser() gin.HandlerFunc {
 		}
 
 		// send email here
-		ctx.JSON(http.StatusCreated, gin.H{"code": code})
+		ctx.JSON(http.StatusCreated, schema.AddUserRes{Code: code})
 	}
 }
 
@@ -104,6 +116,18 @@ func (a *authController) VerifyEmail() gin.HandlerFunc {
 	}
 }
 
+// LoginUser godoc
+// @Summary      Login to an account
+// @Description  login using email or username and password
+// @Tags         auth
+// @Accept       json
+// @Param login body schema.LoginReq true "Login to account"
+// @Produce      json
+// @Success      200  {object} schema.LoginUserRes
+// @Failure      400  {errors}  errors
+// @Failure      404  {errors}  errors
+// @Failure      500  {errors}  errors
+// @Router       /auth/register [post]
 func (a *authController) LoginUser() gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		var request schema.LoginReq
@@ -140,7 +164,7 @@ func (a *authController) LoginUser() gin.HandlerFunc {
 			return
 		}
 
-		ctx.JSON(http.StatusOK, gin.H{"tokens": tokens, "users": new_user})
+		ctx.JSON(http.StatusOK, schema.LoginRes{Token: tokens, User: new_user})
 	}
 }
 

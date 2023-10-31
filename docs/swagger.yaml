@@ -1,0 +1,77 @@
+basePath: /api/v1
+definitions:
+  schema.AddUserReq:
+    properties:
+      email:
+        type: string
+      password:
+        minLength: 6
+        type: string
+      username:
+        minLength: 2
+        type: string
+    required:
+    - email
+    - password
+    - username
+    type: object
+  schema.AddUserRes:
+    properties:
+      code:
+        type: string
+    type: object
+externalDocs:
+  description: OpenAPI
+  url: https://swagger.io/resources/open-api/
+host: localhost:5500
+info:
+  contact:
+    email: support@swagger.io
+    name: API Support
+    url: http://www.swagger.io/support
+  description: This is  the swagger documentation for Glitchz.
+  license:
+    name: Apache 2.0
+    url: http://www.apache.org/licenses/LICENSE-2.0.html
+  termsOfService: http://swagger.io/terms/
+  title: Swagger Docs For Glitchz
+  version: "1.0"
+paths:
+  /auth/register:
+    post:
+      consumes:
+      - application/json
+      description: singup using email username and password
+      parameters:
+      - description: Add User
+        in: body
+        name: user
+        required: true
+        schema:
+          $ref: '#/definitions/schema.AddUserReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/schema.AddUserRes'
+        "400":
+          description: Bad Request
+          schema:
+            type: errors
+        "404":
+          description: Not Found
+          schema:
+            type: errors
+        "500":
+          description: Internal Server Error
+          schema:
+            type: errors
+      summary: Create an account
+      tags:
+      - auth
+securityDefinitions:
+  BasicAuth:
+    type: basic
+swagger: "2.0"

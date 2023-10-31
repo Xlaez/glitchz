@@ -1,11 +1,20 @@
 package schema
 
-import "go.mongodb.org/mongo-driver/bson/primitive"
+import (
+	"glitchz/pkg/models"
+	"glitchz/pkg/services"
+
+	"go.mongodb.org/mongo-driver/bson/primitive"
+)
 
 type AddUserReq struct {
 	Email    string `json:"email" binding:"required,email"`
 	Password string `json:"password" binding:"required,alphanum,min=6"`
 	Username string `json:"username" binding:"required,alphanum,min=2"`
+}
+
+type AddUserRes struct {
+	Code string `json:"code"`
 }
 
 type VerifyEmailReq struct {
@@ -30,6 +39,11 @@ type UserRes struct {
 type LoginReq struct {
 	EmailOrUsername string `json:"emailOrUsername" binding:"required"`
 	Password        string `json:"password" binding:"required,alphanum,min=6"`
+}
+
+type LoginRes struct {
+	Token *services.TokenService `json:"token"`
+	User  models.User            `json:"user"`
 }
 
 type RefreshAccessTokenReq struct {

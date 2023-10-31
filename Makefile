@@ -3,7 +3,7 @@ start:
 stop:
 	docker-compose down
 run:
-	go run cmd/main.go
+	go run main.go
 init-swagger:
-	swag init -g cmd/main.go
+	swag init 
 .PHONY: start, run, init-swagger, stop
